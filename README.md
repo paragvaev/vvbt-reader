@@ -32,6 +32,12 @@ npm run build
 
 Результат находится в `dist/` и подходит для любого статического HTTPS-хостинга: GitHub Pages, Cloudflare Pages, Vercel или собственного сервера.
 
+Ветка `main` автоматически публикуется через GitHub Actions по адресу:
+
+```text
+https://paragvaev.github.io/vvbt-reader/
+```
+
 ## Tilda
 
 Самый простой тест — разместить читалку на статическом хостинге и вставить iframe из `examples/tilda-embed.html` в HTML-блок Tilda. Для каждого письма используется собственная страница Tilda и собственная публичная ссылка `publication.json`.
