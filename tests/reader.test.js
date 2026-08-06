@@ -1,0 +1,45 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { orderedBlocks, publicationModel, selectLetter, validatePublication } from "../src/reader.js";
+
+const publication = {
+  schemaVersion: "1.0",
+  project: { title: "ВВБТ" },
+  sources: [{ id: "source-1", title: "Источник" }],
+  fragments: [
+    { id: "fragment-1", sourceId: "source-1", text: "Original", translation: "Перевод" },
+    { id: "fragment-2", sourceId: "source-1", text: "Второй" }
+  ],
+  images: { "image-1": { id: "image-1", src: "https://example.com/image.jpg", caption: "Подпись" } },
+  letters: [{
+    id: "letter-1",
+    slug: "first-letter",
+    title: "Первое письмо",
+    blocks: [
+      { type: "fragment", fragmentId: "fragment-2", position: 3 },
+      { type: "image", imageId: "image-1", position: 2 },
+      { type: "fragment", fragmentId: "fragment-1", position: 1 }
+    ]
+  }]
+};
+
+test("validates publication and selects a letter by stable slug", () => {
+  assert.equal(validatePublication(publication), publication);
+  assert.equal(selectLetter(publication, "first-letter").id, "letter-1");
+});
+
+test("preserves explicit block order", () => {
+  assert.deepEqual(orderedBlocks(publication.letters[0]).map(block => block.position), [1, 2, 3]);
+});
+
+test("resolves fragments, translations, sources and remote images", () => {
+  const model = publicationModel(publication, "letter-1");
+  assert.equal(model.blocks[0].displayText, "Перевод");
+  assert.equal(model.blocks[0].source.title, "Источник");
+  assert.equal(model.blocks[1].src, "https://example.com/image.jpg");
+  assert.equal(model.blocks[2].displayText, "Второй");
+});
+
+test("rejects malformed publication data", () => {
+  assert.throws(() => validatePublication({}), /нет писем/);
+});

@@ -1,0 +1,48 @@
+:root {
+  color-scheme: light dark;
+  --reader-background: #f7f6f3;
+  --reader-paper: #fff;
+  --reader-label: #20201f;
+  --reader-secondary: #77736c;
+  --reader-separator: rgba(40, 38, 34, .14);
+  --reader-link: #1d5f9d;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --reader-background: #191918;
+    --reader-paper: #222221;
+    --reader-label: #eceae5;
+    --reader-secondary: #aaa69e;
+    --reader-separator: rgba(255, 255, 255, .13);
+    --reader-link: #79b8f3;
+  }
+}
+
+* { box-sizing: border-box; }
+html { background: var(--reader-background); }
+body { margin: 0; color: var(--reader-label); background: var(--reader-background); }
+.vvbt-reader { width: min(100% - 32px, 780px); margin: 0 auto; padding: clamp(52px, 8vw, 108px) 0 96px; }
+.letter-header { margin-bottom: clamp(42px, 7vw, 72px); }
+.project-title { margin-bottom: 12px; color: var(--reader-secondary); font-size: 13px; font-weight: 600; letter-spacing: .055em; text-transform: uppercase; }
+.letter-title { margin: 0; font-family: ui-serif, Georgia, serif; font-size: clamp(34px, 6vw, 58px); font-weight: 500; line-height: 1.08; letter-spacing: -.025em; }
+.letter-content { display: grid; gap: 0; }
+.letter-fragment { padding: 30px 0 28px; border-top: 1px solid var(--reader-separator); }
+.fragment-text { white-space: pre-wrap; font-family: ui-serif, Georgia, serif; font-size: clamp(19px, 2.5vw, 23px); line-height: 1.62; hanging-punctuation: first last; }
+.fragment-source { margin-top: 17px; color: var(--reader-secondary); font-size: 13px; line-height: 1.45; }
+.letter-image { margin: 44px auto; }
+.letter-image.size-small { width: min(100%, 440px); }
+.letter-image.size-medium { width: min(100%, 640px); }
+.letter-image.size-large { width: 100%; }
+.letter-image img { display: block; width: 100%; height: auto; border-radius: 3px; }
+.image-caption { margin-top: 11px; color: var(--reader-secondary); font-size: 13px; line-height: 1.45; }
+.image-missing, .reader-state { padding: 24px; border: 1px solid var(--reader-separator); background: var(--reader-paper); color: var(--reader-secondary); }
+.reader-error { color: #b42318; }
+
+@media (max-width: 600px) {
+  .vvbt-reader { width: min(100% - 36px, 780px); padding-top: 42px; }
+  .letter-fragment { padding: 25px 0 23px; }
+  .letter-image { margin: 32px calc((100vw - 100%) / -2 + 18px); }
+  .letter-image.size-small { width: min(100%, 440px); margin-left: auto; margin-right: auto; }
+}
