@@ -9,7 +9,10 @@
   </head>
   <body>
     <main id="vvbt-reader" class="vvbt-reader" aria-live="polite">
-      <div class="reader-state">Загрузка письма…</div>
+      <div class="reader-loader" role="status">
+        <span class="loader-spinner" aria-hidden="true"></span>
+        <span>Готовим письмо</span>
+      </div>
     </main>
     <script type="module" src="/src/app.js"></script>
   </body>

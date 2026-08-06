@@ -1,9 +1,12 @@
 import { loadPublication, renderPublication } from "./reader.js";
+import { installThemeToggle } from "./theme.js";
 
 const root = document.querySelector("#vvbt-reader");
 const query = new URLSearchParams(location.search);
 const publicationUrl = query.get("publication") || root.dataset.publicationUrl || "";
 const requestedLetter = query.get("letter") || root.dataset.letter || "";
+
+installThemeToggle();
 
 function updateVisualViewportInsets() {
   const viewport = window.visualViewport;
