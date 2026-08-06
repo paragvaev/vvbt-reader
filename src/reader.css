@@ -28,9 +28,20 @@ body { margin: 0; color: var(--reader-label); background: var(--reader-backgroun
 .project-title { margin-bottom: 12px; color: var(--reader-secondary); font-size: 13px; font-weight: 600; letter-spacing: .055em; text-transform: uppercase; }
 .letter-title { margin: 0; font-family: ui-serif, Georgia, serif; font-size: clamp(34px, 6vw, 58px); font-weight: 500; line-height: 1.08; letter-spacing: -.025em; }
 .letter-content { display: grid; gap: 0; }
-.letter-fragment { padding: 30px 0 28px; border-top: 1px solid var(--reader-separator); }
+.letter-fragment {
+  margin: 0 -18px;
+  padding: 30px 18px 28px;
+  border-radius: 16px;
+  outline: none;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+.letter-fragment:focus-visible { background: color-mix(in srgb, var(--reader-label) 5%, transparent); }
+.letter-fragment:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--reader-link) 32%, transparent); }
+.letter-fragment.is-tapped { animation: fragment-pulse 1.8s ease-out; }
+@media (hover: hover) {
+  .letter-fragment:hover { background: color-mix(in srgb, var(--reader-label) 5%, transparent); }
+}
 .fragment-text { white-space: pre-wrap; font-family: ui-serif, Georgia, serif; font-size: clamp(19px, 2.5vw, 23px); line-height: 1.62; hanging-punctuation: first last; }
-.fragment-source { margin-top: 17px; color: var(--reader-secondary); font-size: 13px; line-height: 1.45; }
 .letter-image { margin: 44px auto; }
 .letter-image.size-small { width: min(100%, 440px); }
 .letter-image.size-medium { width: min(100%, 640px); }
@@ -39,10 +50,75 @@ body { margin: 0; color: var(--reader-label); background: var(--reader-backgroun
 .image-caption { margin-top: 11px; color: var(--reader-secondary); font-size: 13px; line-height: 1.45; }
 .image-missing, .reader-state { padding: 24px; border: 1px solid var(--reader-separator); background: var(--reader-paper); color: var(--reader-secondary); }
 .reader-error { color: #b42318; }
+.metadata-dock {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: min(680px, calc(100vw - 36px));
+  min-height: 48px;
+  padding: 10px 18px 10px 11px;
+  border: 1px solid color-mix(in srgb, var(--reader-label) 13%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--reader-paper) 78%, transparent);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, .16), 0 2px 8px rgba(0, 0, 0, .08);
+  color: var(--reader-label);
+  transform: translateX(-50%);
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  animation: dock-appear 150ms ease-out;
+}
+.metadata-dock[hidden] { display: none; }
+.metadata-marker {
+  display: grid;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--reader-label) 9%, transparent);
+  color: var(--reader-secondary);
+  font-family: ui-serif, Georgia, serif;
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 600;
+}
+.metadata-text { overflow: hidden; font-size: 13px; line-height: 1.35; text-overflow: ellipsis; }
+
+@keyframes dock-appear {
+  from { opacity: 0; transform: translate(-50%, 7px) scale(.98); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes fragment-pulse {
+  0% { background: color-mix(in srgb, var(--reader-link) 12%, transparent); }
+  70% { background: color-mix(in srgb, var(--reader-link) 7%, transparent); }
+  100% { background: transparent; }
+}
 
 @media (max-width: 600px) {
   .vvbt-reader { width: min(100% - 36px, 780px); padding-top: 42px; }
   .letter-fragment { padding: 25px 0 23px; }
+  .letter-fragment { margin: 0 -10px; padding-left: 10px; padding-right: 10px; border-radius: 13px; }
   .letter-image { margin: 32px calc((100vw - 100%) / -2 + 18px); }
   .letter-image.size-small { width: min(100%, 440px); margin-left: auto; margin-right: auto; }
+  .metadata-dock {
+    bottom: max(12px, env(safe-area-inset-bottom));
+    max-width: calc(100vw - 24px);
+    min-height: 50px;
+    padding-right: 16px;
+  }
+  .metadata-text {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .letter-fragment, .metadata-dock { transition: none; animation: none; }
 }

@@ -57,7 +57,7 @@ function element(tag, className = "", content = "") {
   return node;
 }
 
-function sourceLine(fragment) {
+export function sourceMetadata(fragment) {
   const source = fragment.source;
   if (!source || source.citationVisibility === "hidden" || fragment.citationVisibility === "hidden") return "";
   const parts = [source.title, source.author, source.year].map(text).filter(Boolean);
@@ -67,10 +67,11 @@ function sourceLine(fragment) {
 
 function renderFragment(block) {
   const article = element("article", "letter-fragment");
+  article.tabIndex = 0;
   const body = element("div", "fragment-text", block.displayText);
   article.append(body);
-  const citation = sourceLine(block);
-  if (citation) article.append(element("footer", "fragment-source", citation));
+  const metadata = sourceMetadata(block);
+  if (metadata) article.dataset.metadata = metadata;
   return article;
 }
 
@@ -90,6 +91,73 @@ function renderImage(block) {
   return figure;
 }
 
+function installMetadataDock(root, content) {
+  const dock = element("aside", "metadata-dock");
+  dock.hidden = true;
+  dock.setAttribute("aria-live", "polite");
+  dock.setAttribute("aria-label", "Сведения об источнике");
+  const marker = element("span", "metadata-marker", "i");
+  marker.setAttribute("aria-hidden", "true");
+  const label = element("span", "metadata-text");
+  dock.append(marker, label);
+  root.append(dock);
+
+  let active = null;
+  let pinned = false;
+  let pulseTimer = 0;
+  const prefersTouch = () => matchMedia("(hover: none), (pointer: coarse)").matches;
+
+  const hide = () => {
+    dock.hidden = true;
+    label.textContent = "";
+    active = null;
+    pinned = false;
+  };
+  const show = (card, options = {}) => {
+    const metadata = card.dataset.metadata;
+    if (!metadata) return;
+    active = card;
+    pinned = Boolean(options.pinned);
+    label.textContent = metadata;
+    dock.hidden = false;
+    if (options.pulse) {
+      card.classList.remove("is-tapped");
+      void card.offsetWidth;
+      card.classList.add("is-tapped");
+      clearTimeout(pulseTimer);
+      pulseTimer = setTimeout(() => card.classList.remove("is-tapped"), 1800);
+    }
+  };
+
+  content.querySelectorAll(".letter-fragment[data-metadata]").forEach(card => {
+    card.addEventListener("pointerenter", () => {
+      if (!prefersTouch()) show(card);
+    });
+    card.addEventListener("pointerleave", () => {
+      if (!prefersTouch() && !pinned && active === card) hide();
+    });
+    card.addEventListener("focus", () => show(card));
+    card.addEventListener("click", event => {
+      event.stopPropagation();
+      if (prefersTouch() && active === card && !dock.hidden) {
+        hide();
+        return;
+      }
+      show(card, { pinned: true, pulse: true });
+    });
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        card.click();
+      }
+      if (event.key === "Escape") hide();
+    });
+  });
+  document.addEventListener("click", event => {
+    if (!event.target.closest(".letter-fragment") && !event.target.closest(".metadata-dock")) hide();
+  });
+}
+
 export function renderPublication(root, data, requestedLetter = "") {
   const model = publicationModel(data, requestedLetter);
   root.replaceChildren();
@@ -101,6 +169,7 @@ export function renderPublication(root, data, requestedLetter = "") {
   const content = element("div", "letter-content");
   model.blocks.forEach(block => content.append(block.type === "image" ? renderImage(block) : renderFragment(block)));
   root.append(content);
+  installMetadataDock(root, content);
   document.title = `${text(model.letter.title) || "Письмо"} — ${projectTitle || "ВВБТ"}`;
   return model;
 }

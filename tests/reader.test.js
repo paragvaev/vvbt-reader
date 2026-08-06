@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizePublicationUrl, orderedBlocks, publicationModel, selectLetter, validatePublication } from "../src/reader.js";
+import { normalizePublicationUrl, orderedBlocks, publicationModel, selectLetter, sourceMetadata, validatePublication } from "../src/reader.js";
 
 const publication = {
   schemaVersion: "1.0",
@@ -52,4 +52,12 @@ test("converts Dropbox shared links to the CORS-enabled content host", () => {
   assert.equal(url.hostname, "dl.dropboxusercontent.com");
   assert.equal(url.searchParams.get("rlkey"), "public-key");
   assert.equal(url.searchParams.has("raw"), false);
+});
+
+test("builds compact source metadata for the contextual dock", () => {
+  assert.equal(sourceMetadata({
+    source: { title: "Источник", author: "Автор", year: "1942" },
+    page: "17"
+  }), "Источник · Автор · 1942 · с. 17");
+  assert.equal(sourceMetadata({ source: { title: "Скрытый", citationVisibility: "hidden" } }), "");
 });
