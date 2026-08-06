@@ -1,7 +1,17 @@
 <!-- Вставить в HTML-блок Tilda после размещения vvbt-reader на публичном HTTPS-адресе. -->
 <iframe
+  id="vvbt-reader-frame"
   title="Письмо — Встречая войну без тебя"
   src="https://READER-HOST.example/?publication=ENCODED_DROPBOX_PUBLICATION_URL"
-  style="display:block;width:100%;min-height:100vh;border:0"
+  style="display:block;width:100%;height:100dvh;min-height:100svh;border:0"
   loading="eager"
 ></iframe>
+
+<style>
+  @media (max-width: 767px) {
+    #vvbt-reader-frame {
+      height: 100svh !important;
+      min-height: 100svh !important;
+    }
+  }
+</style>

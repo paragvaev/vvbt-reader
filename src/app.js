@@ -5,6 +5,19 @@ const query = new URLSearchParams(location.search);
 const publicationUrl = query.get("publication") || root.dataset.publicationUrl || "";
 const requestedLetter = query.get("letter") || root.dataset.letter || "";
 
+function updateVisualViewportInsets() {
+  const viewport = window.visualViewport;
+  const coveredBottom = viewport
+    ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+    : 0;
+  document.documentElement.style.setProperty("--visual-viewport-bottom", `${coveredBottom}px`);
+}
+
+updateVisualViewportInsets();
+window.addEventListener("resize", updateVisualViewportInsets, { passive: true });
+window.visualViewport?.addEventListener("resize", updateVisualViewportInsets, { passive: true });
+window.visualViewport?.addEventListener("scroll", updateVisualViewportInsets, { passive: true });
+
 function showError(error) {
   const box = document.createElement("div");
   box.className = "reader-state reader-error";
