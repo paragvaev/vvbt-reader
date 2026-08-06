@@ -38,6 +38,7 @@ test("resolves fragments, translations, sources and remote images", () => {
   assert.equal(model.blocks[0].source.title, "Источник");
   assert.equal(model.blocks[1].src, "https://example.com/image.jpg");
   assert.equal(model.blocks[2].displayText, "Второй");
+  assert.deepEqual(model.usedSources.map(source => source.id), ["source-1"]);
 });
 
 test("rejects malformed publication data", () => {

@@ -47,7 +47,14 @@ export function publicationModel(data, requestedLetter = "") {
       displayText: text(fragment.translation) || text(fragment.text)
     };
   }).filter(Boolean);
-  return { project: data.project || {}, letter, blocks };
+  const usedSources = [];
+  const seenSources = new Set();
+  for (const block of blocks) {
+    if (block.type !== "fragment" || !block.source || seenSources.has(block.source.id)) continue;
+    seenSources.add(block.source.id);
+    usedSources.push(block.source);
+  }
+  return { project: data.project || {}, letter, blocks, usedSources };
 }
 
 function element(tag, className = "", content = "") {
@@ -96,10 +103,8 @@ function installMetadataDock(root, content) {
   dock.hidden = true;
   dock.setAttribute("aria-live", "polite");
   dock.setAttribute("aria-label", "Сведения об источнике");
-  const marker = element("span", "metadata-marker", "i");
-  marker.setAttribute("aria-hidden", "true");
   const label = element("span", "metadata-text");
-  dock.append(marker, label);
+  dock.append(label);
   root.append(dock);
 
   let active = null;
@@ -136,7 +141,9 @@ function installMetadataDock(root, content) {
     card.addEventListener("pointerleave", () => {
       if (!prefersTouch() && !pinned && active === card) hide();
     });
-    card.addEventListener("focus", () => show(card));
+    card.addEventListener("focus", () => {
+      if (!prefersTouch() && card.matches(":focus-visible")) show(card);
+    });
     card.addEventListener("click", event => {
       event.stopPropagation();
       if (prefersTouch() && active === card && !dock.hidden) {
@@ -158,6 +165,21 @@ function installMetadataDock(root, content) {
   });
 }
 
+function renderSources(sources) {
+  if (!sources.length) return null;
+  const section = element("section", "publication-sources");
+  section.setAttribute("aria-labelledby", "publication-sources-title");
+  const heading = element("h2", "sources-title", "Источники");
+  heading.id = "publication-sources-title";
+  const list = element("ol", "sources-list");
+  for (const source of sources) {
+    const details = [text(source.title), text(source.author), text(source.year)].filter(Boolean);
+    list.append(element("li", "source-item", details.join(" · ")));
+  }
+  section.append(heading, list);
+  return section;
+}
+
 export function renderPublication(root, data, requestedLetter = "") {
   const model = publicationModel(data, requestedLetter);
   root.replaceChildren();
@@ -169,6 +191,8 @@ export function renderPublication(root, data, requestedLetter = "") {
   const content = element("div", "letter-content");
   model.blocks.forEach(block => content.append(block.type === "image" ? renderImage(block) : renderFragment(block)));
   root.append(content);
+  const sources = renderSources(model.usedSources);
+  if (sources) root.append(sources);
   installMetadataDock(root, content);
   document.title = `${text(model.letter.title) || "Письмо"} — ${projectTitle || "ВВБТ"}`;
   return model;
