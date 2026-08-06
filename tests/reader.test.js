@@ -34,6 +34,7 @@ test("preserves explicit block order", () => {
 
 test("resolves fragments, translations, sources and remote images", () => {
   const model = publicationModel(publication, "letter-1");
+  assert.equal(model.blocks[0].type, "fragment");
   assert.equal(model.blocks[0].displayText, "Перевод");
   assert.equal(model.blocks[0].source.title, "Источник");
   assert.equal(model.blocks[1].src, "https://example.com/image.jpg");

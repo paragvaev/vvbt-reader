@@ -41,8 +41,8 @@ export function publicationModel(data, requestedLetter = "") {
     const fragment = fragments.get(block.fragmentId);
     if (!fragment) return null;
     return {
-      type: "fragment",
       ...fragment,
+      type: "fragment",
       source: sources.get(fragment.sourceId) || null,
       displayText: text(fragment.translation) || text(fragment.text)
     };
