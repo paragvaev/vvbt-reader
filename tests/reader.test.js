@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { orderedBlocks, publicationModel, selectLetter, validatePublication } from "../src/reader.js";
+import { normalizePublicationUrl, orderedBlocks, publicationModel, selectLetter, validatePublication } from "../src/reader.js";
 
 const publication = {
   schemaVersion: "1.0",
@@ -42,4 +42,14 @@ test("resolves fragments, translations, sources and remote images", () => {
 
 test("rejects malformed publication data", () => {
   assert.throws(() => validatePublication({}), /нет писем/);
+});
+
+test("converts Dropbox shared links to the CORS-enabled content host", () => {
+  const url = normalizePublicationUrl(
+    "https://www.dropbox.com/scl/fi/file-id/publication.json?rlkey=public-key&raw=1",
+    "https://reader.example/"
+  );
+  assert.equal(url.hostname, "dl.dropboxusercontent.com");
+  assert.equal(url.searchParams.get("rlkey"), "public-key");
+  assert.equal(url.searchParams.has("raw"), false);
 });

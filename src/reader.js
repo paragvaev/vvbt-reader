@@ -105,11 +105,21 @@ export function renderPublication(root, data, requestedLetter = "") {
   return model;
 }
 
+export function normalizePublicationUrl(value, base = window.location.href) {
+  let parsed;
+  try { parsed = new URL(value, base); } catch { throw new Error("Некорректный адрес публикации."); }
+  if (!/^https?:$/.test(parsed.protocol)) throw new Error("Адрес публикации должен использовать HTTPS.");
+  if (parsed.hostname === "www.dropbox.com" && parsed.pathname.startsWith("/scl/fi/")) {
+    parsed.hostname = "dl.dropboxusercontent.com";
+    parsed.searchParams.delete("raw");
+    parsed.searchParams.delete("dl");
+  }
+  return parsed;
+}
+
 export async function loadPublication(url, options = {}) {
   if (!url) throw new Error("Не указан адрес публикации.");
-  let parsed;
-  try { parsed = new URL(url, window.location.href); } catch { throw new Error("Некорректный адрес публикации."); }
-  if (!/^https?:$/.test(parsed.protocol)) throw new Error("Адрес публикации должен использовать HTTPS.");
+  const parsed = normalizePublicationUrl(url);
   const response = await fetch(parsed, { cache: "no-store", signal: options.signal });
   if (!response.ok) throw new Error(`Публикация недоступна (${response.status}).`);
   return validatePublication(await response.json());
