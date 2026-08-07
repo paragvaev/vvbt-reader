@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizePublicationUrl, orderedBlocks, publicationModel, selectLetter, sourceMetadata, validatePublication } from "../src/reader.js";
+import fs from "node:fs";
+import { letterGridColumns, normalizePublicationUrl, orderedBlocks, publicationModel, selectLetter, sourceMetadata, validatePublication } from "../src/reader.js";
 
 const publication = {
   schemaVersion: "1.0",
@@ -62,4 +63,14 @@ test("builds compact source metadata for the contextual dock", () => {
     page: "17"
   }), "Источник · Автор · 1942 · с. 17");
   assert.equal(sourceMetadata({ source: { title: "Скрытый", citationVisibility: "hidden" } }), "");
+});
+
+test("letter navigation uses one row through four letters and then a second row", () => {
+  assert.equal(letterGridColumns(1), 1);
+  assert.equal(letterGridColumns(4), 4);
+  assert.equal(letterGridColumns(5), 4);
+  assert.equal(letterGridColumns(8), 4);
+  const source = fs.readFileSync(new URL("../src/reader.js", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /element\("select", "letter-navigation-select"\)/);
+  assert.match(source, /letter-navigation-item/);
 });

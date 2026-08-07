@@ -1,17 +1,20 @@
-import { loadPublication, renderPublication } from "./reader.js";
+import { loadPublication, renderLetterNavigation, renderPublication } from "./reader.js";
 import { installThemeToggle } from "./theme.js";
+import { createAccessClient, resolveAccessToken, resolveShareToken, selectAccessibleLetter } from "./access.js";
 
 const root = document.querySelector("#vvbt-reader");
 const query = new URLSearchParams(location.search);
 const publicationUrl = query.get("publication") || root.dataset.publicationUrl || "";
 const requestedLetter = query.get("letter") || root.dataset.letter || "";
+const accessToken = resolveAccessToken(query);
+const shareToken = resolveShareToken(query);
 
 installThemeToggle();
 
 function updateVisualViewportInsets() {
   const viewport = window.visualViewport;
   const coveredBottom = viewport
-    ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+    ? Math.min(56, Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop))
     : 0;
   document.documentElement.style.setProperty("--visual-viewport-bottom", `${coveredBottom}px`);
 }
@@ -28,7 +31,26 @@ function showError(error) {
   root.replaceChildren(box);
 }
 
-if (!publicationUrl) {
+async function renderPersonalReader() {
+  const apiBase = root.dataset.apiBase || (location.hostname.endsWith("github.io") ? "https://wwy.vlsv.gay" : location.origin);
+  const client = createAccessClient(shareToken || accessToken, apiBase, { shared: !!shareToken });
+  const session = await client.session();
+  const openLetter = async letter => {
+    const data = await client.letter(letter.slug);
+    renderPublication(root, data);
+    renderLetterNavigation(root, session, letter, openLetter);
+    const url = new URL(location.href);
+    url.searchParams.delete("publication");
+    url.searchParams.delete("t");
+    url.searchParams.set("letter", letter.slug);
+    history.replaceState(null, "", url);
+  };
+  await openLetter(selectAccessibleLetter(session, requestedLetter));
+}
+
+if (shareToken || accessToken) {
+  renderPersonalReader().catch(showError);
+} else if (!publicationUrl) {
   showError(new Error("Не указан адрес publication.json. Добавьте параметр ?publication=…"));
 } else {
   loadPublication(publicationUrl)

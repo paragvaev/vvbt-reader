@@ -34,7 +34,8 @@ export function installThemeToggle() {
   };
 
   apply(theme);
-  button.addEventListener("click", () => {
+  button.addEventListener("click", event => {
+    event.stopPropagation();
     const value = nextTheme(theme);
     try { localStorage.setItem(READER_THEME_KEY, value); } catch {}
     apply(value);

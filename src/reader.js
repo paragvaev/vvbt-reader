@@ -198,6 +198,76 @@ export function renderPublication(root, data, requestedLetter = "") {
   return model;
 }
 
+export function letterGridColumns(count) {
+  return Math.max(1, Math.min(4, Number(count) || 0));
+}
+
+export function renderLetterNavigation(root, session, activeLetter, onSelect) {
+  const nav = element("nav", "letter-navigation");
+  nav.setAttribute("aria-label", "Доступные письма");
+  const toggle = element("button", "letter-navigation-toggle");
+  toggle.type = "button";
+  toggle.setAttribute("aria-label", `Письмо ${activeLetter.number}. Открыть список писем`);
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-controls", "letter-navigation-menu");
+  const current = element("span", "letter-navigation-current", String(activeLetter.number));
+  current.setAttribute("aria-hidden", "true");
+  toggle.append(current);
+
+  const menu = element("div", "letter-navigation-menu");
+  menu.id = "letter-navigation-menu";
+  menu.hidden = true;
+  menu.setAttribute("role", "menu");
+  menu.style.setProperty("--letter-columns", String(letterGridColumns(session.letters.length)));
+  for (const letter of session.letters) {
+    const button = element("button", "letter-navigation-item", String(letter.number));
+    button.type = "button";
+    button.setAttribute("role", "menuitem");
+    button.setAttribute("aria-label", `Открыть письмо ${letter.number}`);
+    if (letter.slug === activeLetter.slug) {
+      button.classList.add("is-current");
+      button.setAttribute("aria-current", "page");
+    }
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      closeMenu(false);
+      if (letter.slug !== activeLetter.slug) onSelect(letter);
+    });
+    menu.append(button);
+  }
+
+  const closeOnOutside = event => {
+    if (!nav.contains(event.target)) closeMenu(false);
+  };
+  const closeMenu = (restoreFocus = true) => {
+    menu.hidden = true;
+    nav.classList.remove("is-open");
+    toggle.setAttribute("aria-expanded", "false");
+    document.removeEventListener("pointerdown", closeOnOutside);
+    if (restoreFocus) toggle.focus();
+  };
+  const openMenu = () => {
+    nav.classList.add("is-open");
+    menu.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+    requestAnimationFrame(() => menu.querySelector(".is-current")?.focus());
+    setTimeout(() => document.addEventListener("pointerdown", closeOnOutside), 0);
+  };
+  toggle.addEventListener("click", event => {
+    event.stopPropagation();
+    if (menu.hidden) openMenu(); else closeMenu();
+  });
+  nav.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !menu.hidden) {
+      event.preventDefault();
+      closeMenu();
+    }
+  });
+  nav.append(toggle, menu);
+  root.prepend(nav);
+  return nav;
+}
+
 export function normalizePublicationUrl(value, base = window.location.href) {
   let parsed;
   try { parsed = new URL(value, base); } catch { throw new Error("Некорректный адрес публикации."); }

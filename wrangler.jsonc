@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vvbt-reader",
+  "compatibility_date": "2026-08-06",
+  "pages_build_output_dir": "./dist",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vvbt-reader",
+      "database_id": "4055f689-37b6-4e8d-bf92-946c1b4c0480",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "READER_ORIGIN": "https://wwy.vlsv.gay",
+    "CAMPAIGN_LAUNCH_AT": "2026-08-10T15:00:00.000Z",
+    "SENDPULSE_ADDRESS_BOOK_IDS": "992404,1145458"
+  }
+}
