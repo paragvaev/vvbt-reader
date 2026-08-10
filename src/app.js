@@ -38,7 +38,7 @@ async function renderPersonalReader() {
   const openLetter = async letter => {
     const data = await client.letter(letter.slug);
     renderPublication(root, data);
-    renderLetterNavigation(root, session, letter, openLetter);
+    if (session.letters.length > 1) renderLetterNavigation(root, session, letter, openLetter);
     const url = new URL(location.href);
     url.searchParams.delete("publication");
     url.searchParams.delete("t");

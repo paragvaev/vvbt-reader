@@ -44,10 +44,14 @@ function requestShareToken(request, url) {
   return auth.startsWith("Shared ") ? auth.slice(7) : url.searchParams.get("share") || "";
 }
 
-async function sharedAccessAuthorized(env, token) {
-  if (!token || token.length < 32) return false;
-  return !!await env.DB.prepare("SELECT 1 FROM share_access WHERE id = 1 AND token = ?")
+async function sharedAccessForToken(env, token) {
+  if (!token || token.length < 32) return null;
+  const series = await env.DB.prepare("SELECT 1 FROM share_access WHERE id = 1 AND token = ?")
     .bind(token).first();
+  if (series) return { scope: "series", letterSlug: null };
+  const letter = await env.DB.prepare("SELECT letter_slug FROM letter_share_access WHERE token = ?")
+    .bind(token).first();
+  return letter?.letter_slug ? { scope: "letter", letterSlug: letter.letter_slug } : null;
 }
 
 async function ensureShareToken(env, now) {
@@ -61,7 +65,26 @@ async function ensureShareToken(env, now) {
   return stored.token;
 }
 
+async function ensureLetterShareToken(env, slug, now) {
+  const existing = await env.DB.prepare("SELECT token FROM letter_share_access WHERE letter_slug = ?")
+    .bind(slug).first();
+  if (existing?.token) return existing.token;
+  const token = randomToken();
+  await env.DB.prepare(`
+    INSERT OR IGNORE INTO letter_share_access (letter_slug, token, created_at, updated_at)
+    VALUES (?, ?, ?, ?)
+  `).bind(slug, token, now, now).run();
+  const stored = await env.DB.prepare("SELECT token FROM letter_share_access WHERE letter_slug = ?")
+    .bind(slug).first();
+  if (!stored?.token) throw new Error("Letter share token was not stored");
+  return stored.token;
+}
+
 export const publishedLetters = letters => letters.filter(letter => !!letter.publication_url);
+export const sharedLetters = (letters, access) => {
+  const published = publishedLetters(letters);
+  return access?.scope === "letter" ? published.filter(letter => letter.slug === access.letterSlug) : published;
+};
 
 async function subscriberForToken(env, token) {
   if (!token || token.length < 32) return null;
@@ -184,15 +207,26 @@ async function publicationAdmin(request, env) {
   } catch {
     return publicError("Не удалось зарегистрировать письмо. Проверьте уникальность номера и slug.", 409);
   }
-  let shareToken;
+  let seriesShareToken;
+  let letterShareToken;
   try {
-    shareToken = await ensureShareToken(env, now);
+    [seriesShareToken, letterShareToken] = await Promise.all([
+      ensureShareToken(env, now),
+      ensureLetterShareToken(env, publication.slug, now)
+    ]);
   } catch {
-    return publicError("Письмо зарегистрировано, но не удалось подготовить общую ссылку.", 500);
+    return publicError("Письмо зарегистрировано, но не удалось подготовить ссылки для чтения.", 500);
   }
   const readerOrigin = String(env.READER_ORIGIN || "https://wwy.vlsv.gay").replace(/\/$/, "");
-  const shareUrl = `${readerOrigin}/?share=${encodeURIComponent(shareToken)}&letter=${encodeURIComponent(publication.slug)}`;
-  return json({ ok: true, letter: { ...publication, updatedAt: now }, shareUrl });
+  const seriesShareUrl = `${readerOrigin}/?share=${encodeURIComponent(seriesShareToken)}&letter=${encodeURIComponent(publication.slug)}`;
+  const letterShareUrl = `${readerOrigin}/?share=${encodeURIComponent(letterShareToken)}&letter=${encodeURIComponent(publication.slug)}`;
+  return json({
+    ok: true,
+    letter: { ...publication, updatedAt: now },
+    shareUrl: seriesShareUrl,
+    seriesShareUrl,
+    letterShareUrl
+  });
 }
 
 async function sendpulseAdminStatus(request, env) {
@@ -256,10 +290,12 @@ async function sendpulseAdminResync(request, env) {
 }
 
 async function sessionResponse(request, env, url) {
-  if (await sharedAccessAuthorized(env, requestShareToken(request, url))) {
-    const letters = publishedLetters(await allLetters(env));
+  const sharedAccess = await sharedAccessForToken(env, requestShareToken(request, url));
+  if (sharedAccess) {
+    const letters = sharedLetters(await allLetters(env), sharedAccess);
     return json({
       shared: true,
+      shareScope: sharedAccess.scope,
       startedAt: null,
       lastRead: 0,
       nextUnlockAt: null,
@@ -279,8 +315,9 @@ async function sessionResponse(request, env, url) {
 }
 
 async function letterResponse(request, env, url, slug) {
-  if (await sharedAccessAuthorized(env, requestShareToken(request, url))) {
-    const letter = publishedLetters(await allLetters(env)).find(item => item.slug === slug);
+  const sharedAccess = await sharedAccessForToken(env, requestShareToken(request, url));
+  if (sharedAccess) {
+    const letter = sharedLetters(await allLetters(env), sharedAccess).find(item => item.slug === slug);
     if (!letter) return publicError("Письмо не опубликовано.", 404);
     const upstream = await fetch(letter.publication_url, { headers: { accept: "application/json" } });
     if (!upstream.ok) return publicError("Не удалось загрузить опубликованное письмо.", 502);

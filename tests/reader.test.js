@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { letterGridColumns, normalizePublicationUrl, orderedBlocks, publicationModel, selectLetter, sourceMetadata, validatePublication } from "../src/reader.js";
+import { letterGridColumns, normalizePublicationUrl, orderedBlocks, publicationModel, quoteSourceLabel, selectLetter, sourceMetadata, validatePublication, wrapCanvasText } from "../src/reader.js";
 
 const publication = {
   schemaVersion: "1.0",
@@ -17,7 +17,8 @@ const publication = {
     slug: "first-letter",
     title: "Первое письмо",
     blocks: [
-      { type: "fragment", fragmentId: "fragment-2", position: 3 },
+      { type: "fragment", fragmentId: "fragment-2", position: 4 },
+      { type: "break", position: 3 },
       { type: "image", imageId: "image-1", position: 2 },
       { type: "fragment", fragmentId: "fragment-1", position: 1 }
     ]
@@ -30,7 +31,7 @@ test("validates publication and selects a letter by stable slug", () => {
 });
 
 test("preserves explicit block order", () => {
-  assert.deepEqual(orderedBlocks(publication.letters[0]).map(block => block.position), [1, 2, 3]);
+  assert.deepEqual(orderedBlocks(publication.letters[0]).map(block => block.position), [1, 2, 3, 4]);
 });
 
 test("resolves fragments, translations, sources and remote images", () => {
@@ -39,7 +40,8 @@ test("resolves fragments, translations, sources and remote images", () => {
   assert.equal(model.blocks[0].displayText, "Перевод");
   assert.equal(model.blocks[0].source.title, "Источник");
   assert.equal(model.blocks[1].src, "https://example.com/image.jpg");
-  assert.equal(model.blocks[2].displayText, "Второй");
+  assert.equal(model.blocks[2].type, "break");
+  assert.equal(model.blocks[3].displayText, "Второй");
   assert.deepEqual(model.usedSources.map(source => source.id), ["source-1"]);
 });
 
@@ -65,6 +67,20 @@ test("builds compact source metadata for the contextual dock", () => {
   assert.equal(sourceMetadata({ source: { title: "Скрытый", citationVisibility: "hidden" } }), "");
 });
 
+test("builds the share-card source label as author and title", () => {
+  assert.equal(quoteSourceLabel({ source: { author: "Автор", title: "Название", year: "1942" } }), "Автор • Название");
+  assert.equal(quoteSourceLabel({ source: { title: "Название" } }), "Название");
+});
+
+test("desktop metadata stays pinned until sharing or an explicit selection change", () => {
+  const source = fs.readFileSync(new URL("../src/reader.js", import.meta.url), "utf8");
+  assert.match(source, /const show = \(card, options = \{\}\) => \{[\s\S]*?clearTimeout\(hideTimer\);[\s\S]*?active = card/);
+  assert.match(source, /if \(!prefersTouch\(\) && !pinned\) show\(card\)/);
+  assert.match(source, /active === card && !dock\.hidden && \(touch \|\| pinned\)/);
+  assert.match(source, /const clearAfterShare = !prefersTouch\(\)/);
+  assert.match(source, /if \(clearAfterShare\) hide\(\)/);
+});
+
 test("letter navigation uses one row through four letters and then a second row", () => {
   assert.equal(letterGridColumns(1), 1);
   assert.equal(letterGridColumns(4), 4);
@@ -73,4 +89,16 @@ test("letter navigation uses one row through four letters and then a second row"
   const source = fs.readFileSync(new URL("../src/reader.js", import.meta.url), "utf8");
   assert.doesNotMatch(source, /element\("select", "letter-navigation-select"\)/);
   assert.match(source, /letter-navigation-item/);
+  const app = fs.readFileSync(new URL("../src/app.js", import.meta.url), "utf8");
+  assert.match(app, /session\.letters\.length > 1/);
+});
+
+test("wraps quote-card text without losing words", () => {
+  const context = { measureText: value => ({ width: value.length * 10 }) };
+  assert.deepEqual(wrapCanvasText(context, "Один два три четыре", 80), ["Один два", "три", "четыре"]);
+  const source = fs.readFileSync(new URL("../src/reader.js", import.meta.url), "utf8");
+  assert.match(source, /ВСТРЕЧАЯ ВОЙНУ БЕЗ ТЕБЯ \| ВИЛИСОВ/);
+  assert.match(source, /@vvllsv/);
+  assert.match(source, /navigator\.canShare/);
+  assert.match(source, /Готовим картинку/);
 });

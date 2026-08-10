@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { resolveAccessToken, resolveShareToken, selectAccessibleLetter } from "../src/access.js";
 import { effectiveStartAt, isLetterUnlocked, nextUnlock, unlockedLetters } from "../worker/access-rules.js";
-import { configuredAddressBookIds, publishedLetters, sendpulseWebhookResult, validatePublicationRegistration } from "../worker/index.js";
+import { configuredAddressBookIds, publishedLetters, sendpulseWebhookResult, sharedLetters, validatePublicationRegistration } from "../worker/index.js";
 
 const letters = [
   { number: 1, slug: "one", publication_url: "https://example.com/1", release_after_days: 0 },
@@ -28,6 +28,12 @@ test("does not expose letters without publication data", () => {
 
 test("shared-reader navigation contains every published letter regardless of schedule", () => {
   assert.deepEqual(publishedLetters(letters).map(item => item.number), [1, 2]);
+});
+
+test("letter-scoped sharing exposes exactly one published letter", () => {
+  assert.deepEqual(sharedLetters(letters, { scope: "letter", letterSlug: "two" }).map(item => item.number), [2]);
+  assert.deepEqual(sharedLetters(letters, { scope: "letter", letterSlug: "three" }), []);
+  assert.deepEqual(sharedLetters(letters, { scope: "series", letterSlug: null }).map(item => item.number), [1, 2]);
 });
 
 test("reports the next configured unlock", () => {
