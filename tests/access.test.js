@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { resolveAccessToken, resolveShareToken, selectAccessibleLetter } from "../src/access.js";
 import { effectiveStartAt, isLetterUnlocked, nextUnlock, unlockedLetters } from "../worker/access-rules.js";
-import { configuredAddressBookIds, publishedLetters, sendpulseWebhookResult, sharedLetters, validatePublicationRegistration } from "../worker/index.js";
+import { configuredAddressBookIds, publishedLetters, sendpulseWebhookResult, sendpulseWebhookVerified, sharedLetters, validatePublicationRegistration } from "../worker/index.js";
 
 const letters = [
   { number: 1, slug: "one", publication_url: "https://example.com/1", release_after_days: 0 },
@@ -91,4 +91,9 @@ test("limits SendPulse token synchronization to configured address books", () =>
 test("returns the Automation 360 webhook acknowledgement format", async () => {
   const response = sendpulseWebhookResult(true, "reader_token synchronized");
   assert.deepEqual(await response.json(), [{ status: true, message: "reader_token synchronized", code: 1 }]);
+});
+
+test("returns the SendPulse frequency-limit verification code after successful synchronization", async () => {
+  const response = sendpulseWebhookVerified();
+  assert.deepEqual(await response.json(), { code: "eb092918a4964088b3fa8029e68335b7" });
 });

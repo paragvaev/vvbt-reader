@@ -6,8 +6,10 @@ const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(d
 });
 
 const publicError = (message, status = 400) => json({ error: message }, status);
+const SENDPULSE_WEBHOOK_VERIFICATION_CODE = "eb092918a4964088b3fa8029e68335b7";
 export const sendpulseWebhookResult = (status, message, code = status ? 1 : 11110111, httpStatus = 200) =>
   json([{ status, message, code }], httpStatus);
+export const sendpulseWebhookVerified = () => json({ code: SENDPULSE_WEBHOOK_VERIFICATION_CODE });
 const utf8 = value => new TextEncoder().encode(value);
 const hex = buffer => [...new Uint8Array(buffer)].map(value => value.toString(16).padStart(2, "0")).join("");
 const sha256 = async value => hex(await crypto.subtle.digest("SHA-256", utf8(value)));
@@ -139,18 +141,7 @@ async function writeReaderTokenToSendpulse(env, email, token, selectedAddressBoo
   return synchronized;
 }
 
-async function registerSubscriber(request, env, url) {
-  const suppliedKey = url.searchParams.get("key") || request.headers.get("x-vvbt-webhook-key") || "";
-  if (!env.SENDPULSE_WEBHOOK_KEY || suppliedKey !== env.SENDPULSE_WEBHOOK_KEY) return publicError("Доступ запрещён.", 403);
-  let email = url.searchParams.get("email") || "";
-  if (request.method === "POST" && request.headers.get("content-type")?.includes("application/json")) {
-    const body = await request.json().catch(() => ({}));
-    const event = Array.isArray(body) ? body[0] || {} : body;
-    email = event.email || email;
-  }
-  email = String(email).trim().toLowerCase();
-  if (!/^\S+@\S+\.\S+$/.test(email)) return sendpulseWebhookResult(false, "Не указан корректный email.", 11110111, 400);
-
+async function synchronizeSubscriber(email, env) {
   const now = new Date().toISOString();
   const emailHash = await sha256(email);
   const token = randomToken();
@@ -164,9 +155,32 @@ async function registerSubscriber(request, env, url) {
     ON CONFLICT(email_hash) DO UPDATE SET token_hash = excluded.token_hash, status = 'active', updated_at = excluded.updated_at
   `).bind(id, emailHash, tokenHash, startedAt, now, now).run();
 
+  const synchronizedAddressBooks = await writeReaderTokenToSendpulse(env, email, token);
+  if (synchronizedAddressBooks < 1) throw new Error("reader_token synchronization failed");
+}
+
+async function registerSubscriber(request, env, url, executionContext) {
+  const suppliedKey = url.searchParams.get("key") || request.headers.get("x-vvbt-webhook-key") || "";
+  if (!env.SENDPULSE_WEBHOOK_KEY || suppliedKey !== env.SENDPULSE_WEBHOOK_KEY) return publicError("Доступ запрещён.", 403);
+  let email = url.searchParams.get("email") || "";
+  if (request.method === "POST" && request.headers.get("content-type")?.includes("application/json")) {
+    const body = await request.json().catch(() => ({}));
+    const event = Array.isArray(body) ? body[0] || {} : body;
+    email = event.email || email;
+  }
+  email = String(email).trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(email)) return sendpulseWebhookResult(false, "Не указан корректный email.", 11110111, 400);
+
+  const work = synchronizeSubscriber(email, env);
+  if (executionContext?.waitUntil) {
+    executionContext.waitUntil(work.catch(error => {
+      console.error("SendPulse token synchronization failed", error instanceof Error ? error.message : "unknown error");
+    }));
+    return sendpulseWebhookVerified();
+  }
   try {
-    const synchronizedAddressBooks = await writeReaderTokenToSendpulse(env, email, token);
-    return sendpulseWebhookResult(true, `reader_token synchronized in ${synchronizedAddressBooks} address book(s)`);
+    await work;
+    return sendpulseWebhookVerified();
   } catch (error) {
     console.error("SendPulse token synchronization failed", error instanceof Error ? error.message : "unknown error");
     return sendpulseWebhookResult(false, "reader_token synchronization failed");
@@ -340,10 +354,10 @@ async function letterResponse(request, env, url, slug) {
   return json(data);
 }
 
-export async function handleApiRequest(request, env) {
+export async function handleApiRequest(request, env, executionContext) {
   const url = new URL(request.url);
   if (url.pathname === "/api/session" && request.method === "GET") return sessionResponse(request, env, url);
-  if (["/api/sendpulse/subscribe", "/api/sendpulse/subscribe-v2"].includes(url.pathname) && ["GET", "POST"].includes(request.method)) return registerSubscriber(request, env, url);
+  if (["/api/sendpulse/subscribe", "/api/sendpulse/subscribe-v2"].includes(url.pathname) && ["GET", "POST"].includes(request.method)) return registerSubscriber(request, env, url, executionContext);
   if (url.pathname === "/api/admin/publications" && ["GET", "POST"].includes(request.method)) return publicationAdmin(request, env);
   if (url.pathname === "/api/admin/sendpulse/status" && request.method === "POST") return sendpulseAdminStatus(request, env);
   if (url.pathname === "/api/admin/sendpulse/resync" && request.method === "POST") return sendpulseAdminResync(request, env);
@@ -353,9 +367,9 @@ export async function handleApiRequest(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, executionContext) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/")) return handleApiRequest(request, env);
+    if (url.pathname.startsWith("/api/")) return handleApiRequest(request, env, executionContext);
     return env.ASSETS.fetch(request);
   }
 };
