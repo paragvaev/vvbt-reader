@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { resolveAccessToken, resolveShareToken, selectAccessibleLetter } from "../src/access.js";
 import { effectiveStartAt, isLetterUnlocked, nextUnlock, unlockedLetters } from "../worker/access-rules.js";
-import { configuredAddressBookIds, publishedLetters, sendpulseWebhookResult, sendpulseWebhookVerified, sharedLetters, validatePublicationRegistration } from "../worker/index.js";
+import { configuredAddressBookIds, handleApiRequest, publishedLetters, sendpulseWebhookResult, sendpulseWebhookVerified, sharedLetters, validatePublicationRegistration } from "../worker/index.js";
 
 const letters = [
   { number: 1, slug: "one", publication_url: "https://example.com/1", release_after_days: 0 },
@@ -34,6 +34,39 @@ test("letter-scoped sharing exposes exactly one published letter", () => {
   assert.deepEqual(sharedLetters(letters, { scope: "letter", letterSlug: "two" }).map(item => item.number), [2]);
   assert.deepEqual(sharedLetters(letters, { scope: "letter", letterSlug: "three" }), []);
   assert.deepEqual(sharedLetters(letters, { scope: "series", letterSlug: null }).map(item => item.number), [1, 2]);
+});
+
+test("admin can read existing permanent links without changing publication records", async () => {
+  const queries = [];
+  const env = {
+    PUBLICATION_ADMIN_KEY: "admin-key",
+    READER_ORIGIN: "https://wwy.vlsv.gay",
+    DB: { prepare(sql) {
+      queries.push(sql);
+      if (sql.includes("FROM letters")) return { all: async () => ({ results: [
+        { number: 1, slug: "one", title: "Первое", publication_url: "https://example.com/1" },
+        { number: 2, slug: "two", title: "Второе", publication_url: null }
+      ] }) };
+      if (sql.includes("FROM share_access")) return { first: async () => ({ token: "series-token" }) };
+      if (sql.includes("FROM letter_share_access")) return { all: async () => ({ results: [{ letter_slug: "one", token: "letter-token" }] }) };
+      throw new Error("Unexpected query");
+    } }
+  };
+  const endpoint = "https://wwy.vlsv.gay/api/admin/publication-links";
+  const denied = await handleApiRequest(new Request(endpoint), env);
+  assert.equal(denied.status, 403);
+  assert.deepEqual(queries, []);
+  const response = await handleApiRequest(new Request(endpoint, { headers: { authorization: "Bearer admin-key" } }), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).letters, [{
+    number: 1,
+    slug: "one",
+    title: "Первое",
+    seriesShareUrl: "https://wwy.vlsv.gay/?share=series-token&letter=one",
+    letterShareUrl: "https://wwy.vlsv.gay/?share=letter-token&letter=one"
+  }]);
+  assert.equal(queries.length, 3);
+  assert.ok(queries.every(query => /^SELECT\b/.test(query)));
 });
 
 test("reports the next configured unlock", () => {

@@ -243,6 +243,27 @@ async function publicationAdmin(request, env) {
   });
 }
 
+async function publicationAdminLinks(request, env) {
+  if (!publicationAdminAuthorized(request, env)) return publicError("Доступ запрещён.", 403);
+  const [letters, series, letterLinks] = await Promise.all([
+    allLetters(env),
+    env.DB.prepare("SELECT token FROM share_access WHERE id = 1").first(),
+    env.DB.prepare("SELECT letter_slug, token FROM letter_share_access").all()
+  ]);
+  const tokensBySlug = new Map((letterLinks.results || []).map(item => [item.letter_slug, item.token]));
+  const readerOrigin = String(env.READER_ORIGIN || "https://wwy.vlsv.gay").replace(/\/$/, "");
+  const urlFor = (token, slug) => token
+    ? `${readerOrigin}/?share=${encodeURIComponent(token)}&letter=${encodeURIComponent(slug)}`
+    : null;
+  return json({ ok: true, letters: publishedLetters(letters).map(letter => ({
+    number: letter.number,
+    slug: letter.slug,
+    title: letter.title,
+    seriesShareUrl: urlFor(series?.token, letter.slug),
+    letterShareUrl: urlFor(tokensBySlug.get(letter.slug), letter.slug)
+  })) });
+}
+
 async function sendpulseAdminStatus(request, env) {
   if (!publicationAdminAuthorized(request, env)) return publicError("Доступ запрещён.", 403);
   const body = await request.json().catch(() => ({}));
@@ -359,6 +380,7 @@ export async function handleApiRequest(request, env, executionContext) {
   if (url.pathname === "/api/session" && request.method === "GET") return sessionResponse(request, env, url);
   if (["/api/sendpulse/subscribe", "/api/sendpulse/subscribe-v2"].includes(url.pathname) && ["GET", "POST"].includes(request.method)) return registerSubscriber(request, env, url, executionContext);
   if (url.pathname === "/api/admin/publications" && ["GET", "POST"].includes(request.method)) return publicationAdmin(request, env);
+  if (url.pathname === "/api/admin/publication-links" && request.method === "GET") return publicationAdminLinks(request, env);
   if (url.pathname === "/api/admin/sendpulse/status" && request.method === "POST") return sendpulseAdminStatus(request, env);
   if (url.pathname === "/api/admin/sendpulse/resync" && request.method === "POST") return sendpulseAdminResync(request, env);
   const match = url.pathname.match(/^\/api\/letters\/([a-z0-9-]+)$/);
